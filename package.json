@@ -6,7 +6,8 @@
   "scripts": {
     "tomb:deploy:rebate-composite-oracle": "hardhat run scripts/tomb/deploy-rebate-composite-oracle.ts",
     "tomb:update:rebate-oracles": "hardhat run scripts/tomb/update-rebate-oracles.ts",
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "hardhat test",
+    "tomb:test:smoke": "hardhat test test/TombDeployment.test.ts",
     "clean": "rm -fr ./artifacts ./cache  ./coverage ./typechain-types",
     "verify:sourcify": "node scripts/verify-sourcify.mjs",
     "tomb:deploy:foundation": "hardhat run scripts/tomb/deploy-foundation.ts",

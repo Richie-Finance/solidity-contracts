@@ -56,10 +56,8 @@ contract GenesisRewardPool is ReentrancyGuard {
 
     constructor(address _peg, uint256 _poolStartTime) {
         require(block.timestamp < _poolStartTime, "late");
-
-        if (_peg != address(0)) {
-            peg = IERC20(_peg);
-        }
+        require(_peg != address(0), "Zero PEG");
+        peg = IERC20(_peg);
 
         poolStartTime = _poolStartTime;
         poolEndTime = poolStartTime + runningTime;

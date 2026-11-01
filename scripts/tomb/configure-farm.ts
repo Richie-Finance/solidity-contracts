@@ -9,7 +9,12 @@ export async function main(ctx?: Context) {
   const fee = uint("TOMB_PSM_FEE_BPS", 3000n);
   const age = uint("TOMB_PSM_MAX_ORACLE_AGE", 7200n);
   const threshold = uint("TOMB_MIN_CLAIM_THRESHOLD", 1000000000000n);
-  const enabled = flag("TOMB_PSM_ENABLED");
+  const currentEnabled = await farm.pegStabilityModuleFeeEnabled();
+  // An omitted flag means "leave the live setting unchanged". Defaulting an
+  // active Farm to false would silently create a fee-free harvest state.
+  const enabled = process.env.TOMB_PSM_ENABLED
+    ? flag("TOMB_PSM_ENABLED")
+    : currentEnabled;
   const recipient = address("TOMB_PSM_FEE_RECIPIENT");
   if (fee > 5000n || age < 300n || age > 604800n || threshold > 10n ** 18n) throw new Error("Invalid farm fee, max oracle age, or claim threshold");
   const pools = process.env.TOMB_FARM_POOLS ? jsonArray<Pool>("TOMB_FARM_POOLS") : [];
@@ -52,14 +57,18 @@ export async function main(ctx?: Context) {
       await send(`Set farm allocation ${pid}`, () => farm.set(pid, allocation));
     }
   }
-  // Temporarily disable validation while replacing oracle settings; enable only after final checks.
-  if (await farm.pegStabilityModuleFeeEnabled()) await send("Disable PSM while configuring", () => farm.setPegStabilityModuleFeeEnabled(false));
+  // Keep an active PSM enabled while applying compatible settings. Farm's
+  // setters validate live oracle-dependent changes and revert atomically.
   if (oracleAddress && getAddress(await farm.shareOracle()) !== oracleAddress) await send("Set SHARE oracle", () => farm.setShareOracle(oracleAddress));
   if (await farm.pegStabilityModuleFee() !== fee) await send("Set PSM fee", () => farm.setPegStabilityModuleFee(fee));
   if (await farm.maxOracleAge() !== age) await send("Set maximum oracle age", () => farm.setMaxOracleAge(age));
   if (await farm.minClaimThreshold() !== threshold) await send("Set claim threshold", () => farm.setMinClaimThreshold(threshold));
   if (getAddress(await farm.psmFeeRecipient()) !== recipient) await send("Set PSM fee recipient", () => farm.setPsmFeeRecipient(recipient));
-  if (enabled) await send("Enable PSM", () => farm.setPegStabilityModuleFeeEnabled(true));
+  if (await farm.pegStabilityModuleFeeEnabled() !== enabled) {
+    await send(`${enabled ? "Enable" : "Disable"} PSM`, () =>
+      farm.setPegStabilityModuleFeeEnabled(enabled),
+    );
+  }
   console.log("Farm configuration complete. Reward funding is handled by configure-system.ts.");
 }
 await entry(import.meta.url, () => main());

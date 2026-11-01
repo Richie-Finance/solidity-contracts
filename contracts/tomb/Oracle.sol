@@ -686,15 +686,5 @@ contract Oracle is Epoch {
         }
     }
 
-    function twap(address _token, uint256 _amountIn) external view returns (uint144 _amountOut) {
-        (uint256 price0Cumulative, uint256 price1Cumulative, uint32 blockTimestamp) = UniswapV2OracleLibrary.currentCumulativePrices(address(pair));
-        uint32 timeElapsed = blockTimestamp - blockTimestampLast; // overflow is desired
-        if (_token == token0) {
-            _amountOut = FixedPoint.uq112x112(uint224((price0Cumulative - price0CumulativeLast) / timeElapsed)).mul(_amountIn).decode144();
-        } else if (_token == token1) {
-            _amountOut = FixedPoint.uq112x112(uint224((price1Cumulative - price1CumulativeLast) / timeElapsed)).mul(_amountIn).decode144();
-        }
-    }
-
     event Updated(uint256 price0CumulativeLast, uint256 price1CumulativeLast);
 }

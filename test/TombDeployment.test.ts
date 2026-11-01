@@ -1,7 +1,10 @@
 import { expect } from "chai";
 import { network } from "hardhat";
+import { main as deployFoundation } from "../scripts/tomb/deploy-foundation.js";
+import { main as deployPegOracle } from "../scripts/tomb/deploy-oracle.js";
+import { main as deployCore } from "../scripts/tomb/deploy-core.js";
 import { main as deployFarm } from "../scripts/tomb/deploy-farm.js";
-import { main as deployOracle } from "../scripts/tomb/deploy-share-oracle.js";
+import { main as deployShareOracle } from "../scripts/tomb/deploy-share-oracle.js";
 import { main as deployRebateOracle } from "../scripts/tomb/deploy-rebate-oracle.js";
 import { main as deployPlsOracle } from "../scripts/tomb/deploy-rebate-pls-oracle.js";
 import { main as deployRedeem } from "../scripts/tomb/deploy-redeem.js";
@@ -25,7 +28,7 @@ describe("Tomb deployment and configuration scripts", () => {
     expect(isPoolBoundsRevert({ code: -32000, message: "execution reverted", data: "0x1234" })).to.equal(false);
     expect(isPoolBoundsRevert({ code: "NETWORK_ERROR", message: "execution reverted" })).to.equal(false);
   });
-  it("deploys remaining contracts, configures and funds once, primes PSM, and transfers administration", async () => {
+  it("deploys, configures, operates, and transfers the complete local system", async () => {
     const saved = Object.fromEntries(Object.entries(process.env).filter(([key]) => key.startsWith("TOMB_")));
     for (const key of Object.keys(saved)) delete process.env[key];
     try {
@@ -33,21 +36,27 @@ describe("Tomb deployment and configuration scripts", () => {
       const ctx = { ethers, signer };
       const start = BigInt((await ethers.provider.getBlock("latest"))!.timestamp) + 86400n;
       process.env.TOMB_START_TIME = String(start);
-      const peg = await ethers.deployContract("contracts/tomb/Peg.sol:Peg");
-      const share = await ethers.deployContract("contracts/tomb/Share.sol:Share", [start, signer.address]);
-      const genesis = await ethers.deployContract("GenesisRewardPool", [await peg.getAddress(), start]);
-      const treasury = await ethers.deployContract("Treasury");
-      const boardroom = await ethers.deployContract("Boardroom");
+      process.env.TOMB_COMMUNITY_FUND = signer.address;
+      const { peg, share, genesis } = await deployFoundation(ctx);
       const token = await ethers.deployContract("TombScriptToken");
       Object.assign(process.env, {
         TOMB_PEG_ADDRESS: await peg.getAddress(), TOMB_SHARE_ADDRESS: await share.getAddress(),
-        TOMB_GENESIS_ADDRESS: await genesis.getAddress(), TOMB_TREASURY_ADDRESS: await treasury.getAddress(),
-        TOMB_BOARDROOM_ADDRESS: await boardroom.getAddress(), TOMB_PSM_FEE_RECIPIENT: admin.address,
+        TOMB_GENESIS_ADDRESS: await genesis.getAddress(), TOMB_PSM_FEE_RECIPIENT: admin.address,
       });
+      const pegOraclePair = await ethers.deployContract("TombScriptPair", [await peg.getAddress(), await token.getAddress()]);
+      await pegOraclePair.setReserves(ethers.parseEther("1"), ethers.parseEther("1.1"));
+      process.env.TOMB_PAIR_ADDRESS = await pegOraclePair.getAddress();
+      process.env.TOMB_ORACLE_PERIOD = "3600";
+      process.env.TOMB_ORACLE_START_TIME = String(start - 86400n);
+      const pegOracle = await deployPegOracle(ctx);
+      process.env.TOMB_ORACLE_ADDRESS = await pegOracle.getAddress();
+      const { treasury, boardroom } = await deployCore(ctx);
+      process.env.TOMB_TREASURY_ADDRESS = await treasury.getAddress();
+      process.env.TOMB_BOARDROOM_ADDRESS = await boardroom.getAddress();
       const pair = await ethers.deployContract("TombScriptPair", [await share.getAddress(), "0xA1077a294dDE1B09bB078844df40758a5D0f9a27"]);
       process.env.TOMB_SHARE_PAIR_ADDRESS = await pair.getAddress();
       process.env.TOMB_SHARE_ORACLE_START_TIME = String(start - 86400n);
-      const oracle = await deployOracle(ctx);
+      const oracle = await deployShareOracle(ctx);
       process.env.TOMB_SHARE_ORACLE_ADDRESS = await oracle.getAddress();
       const daiAddress = "0xefd766ccb38eaf1dfd701853bfce31359239f305";
       const dai = await ethers.deployContract("TombScriptToken");
@@ -67,9 +76,6 @@ describe("Tomb deployment and configuration scripts", () => {
       const plsOracle = await deployPlsOracle(ctx);
       process.env.TOMB_REBATE_PLS_ORACLE_ADDRESS = await plsOracle.getAddress();
       process.env.TOMB_REBATE_PLS_ENABLED = "true";
-      // The test only exercises wiring; Treasury pricing needs its own PEG oracle in production.
-      await treasury.initialize(await peg.getAddress(), await share.getAddress(), await oracle.getAddress(), await boardroom.getAddress(), start);
-      await boardroom.initialize(await peg.getAddress(), await share.getAddress(), await treasury.getAddress());
       const farm = await deployFarm(ctx);
       process.env.TOMB_FARM_ADDRESS = await farm.getAddress();
       expect(await farm.psmFeeRecipient()).to.equal(admin.address);
@@ -95,11 +101,44 @@ describe("Tomb deployment and configuration scripts", () => {
       expect(await share.balanceOf(await farm.getAddress())).to.equal(ethers.parseEther("40000"));
       expect(await peg.operator()).to.equal(await treasury.getAddress());
       expect(await boardroom.operator()).to.equal(await treasury.getAddress());
+      await token.mint(admin.address, ethers.parseEther("200"));
+      await token.connect(admin).approve(await genesis.getAddress(), ethers.MaxUint256);
+      await token.connect(admin).approve(await farm.getAddress(), ethers.MaxUint256);
+      await genesis.connect(admin).deposit(0, ethers.parseEther("100"));
+      await farm.connect(admin).deposit(0, ethers.parseEther("100"));
+      await share.approve(await boardroom.getAddress(), ethers.MaxUint256);
+      await boardroom.stake(ethers.parseEther("0.5"));
       await networkHelpers.time.increase(3601);
       await updateOracles(ctx);
       process.env.TOMB_PSM_ENABLED = "true";
       await configureFarm(ctx);
       expect(await farm.pegStabilityModuleFeeEnabled()).to.equal(true);
+      const enabledBlock = await ethers.provider.getBlockNumber();
+      delete process.env.TOMB_PSM_ENABLED;
+      process.env.TOMB_PSM_FEE_BPS = "2500";
+      await configureFarm(ctx);
+      expect(await farm.pegStabilityModuleFeeEnabled()).to.equal(true);
+      expect(await farm.pegStabilityModuleFee()).to.equal(2500n);
+      const enablementChanges = await farm.queryFilter(
+        farm.filters.PegStabilityModuleFeeEnabledChanged(),
+        enabledBlock + 1,
+      );
+      expect(enablementChanges).to.have.length(0);
+      await networkHelpers.time.increaseTo(start + 100n);
+      await treasury.allocateSeigniorage();
+      expect(await boardroom.earned(signer.address)).to.be.greaterThan(0n);
+      await oracle.update();
+      const cashBefore = await peg.balanceOf(admin.address);
+      await genesis.connect(admin).withdraw(0, 0);
+      expect(await peg.balanceOf(admin.address)).to.be.greaterThan(cashBefore);
+      const pendingRich = await farm.pendingShare(0, admin.address);
+      const psmFee = await farm.quotePegStabilityModuleFee(pendingRich);
+      // The harvest transaction lands in a later block and accrues a little
+      // more RICH, so include a buffer; Farm refunds all excess PLS.
+      await farm.connect(admin).harvest(0, {
+        value: psmFee + ethers.parseEther("1"),
+      });
+      expect(await share.balanceOf(admin.address)).to.be.greaterThan(0n);
       process.env.TOMB_PDAI_ADDRESS = await token.getAddress();
       process.env.TOMB_REDEEM_PEG_RECIPIENT = admin.address;
       const redeem = await deployRedeem(ctx);
@@ -143,6 +182,7 @@ describe("Tomb deployment and configuration scripts", () => {
       expect(await farm.operator()).to.equal(admin.address);
       expect(await share.owner()).to.equal(admin.address);
       expect(await share.operator()).to.equal(await treasury.getAddress());
+      expect(await pegOracle.owner()).to.equal(admin.address);
       expect(await oracle.owner()).to.equal(admin.address);
       expect(await rebateOracle.owner()).to.equal(admin.address);
       expect(await plsOracle.owner()).to.equal(admin.address);

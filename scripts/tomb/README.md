@@ -113,9 +113,12 @@ Run these commands from the repository root. They select PulseChain mainnet.
 
    Wait a full observation period after deployment/last update. The script
    skips observations not ready; it does not sleep or install a scheduler.
-   Run regularly before SHARE becomes stale, and update PEG before Treasury
-   allocations. Once SHARE has a fresh nonzero price, set
+   Run regularly before SHARE becomes stale. Treasury updates the PEG oracle
+   inside `allocateSeigniorage()`, so do not send a separate PEG update
+   immediately before allocation. Once SHARE has a fresh nonzero price, set
    `TOMB_PSM_ENABLED=true` and rerun farm configuration.
+   Later reruns may omit `TOMB_PSM_ENABLED` to preserve the current on-chain
+   state. Configuration never temporarily disables an active PSM.
    PSM collects native PLS at harvest using RICH/WPLS pricing. Fee defaults
    to 3,000 bps (30%), maximum 5,000 (50%). Thresholds use raw token units.
 
@@ -181,9 +184,10 @@ after full observation windows. Use comparable source periods; the cross-price
 is a product of stored TWAPs, not an exact direct RICH/DAI TWAP. Both pools
 still need sufficient liquidity. The oldest timestamp is reported and both
 sources must be fresh/nonzero; no spot-price fallback is used.
-The adapter does not repair the existing Oracle.sol short-window update finding:
-direct updates by another caller can still overwrite a source average near an
-epoch boundary. Its guarded update route cannot block those direct calls.
+`Oracle.update()` requires a complete elapsed observation period, so a caller
+cannot replace a stored source average with a one-second window. The composite
+adapter still combines two separately timed observations; use comparable source
+periods and operate both source updates together.
 The adapter has immutable sources and maximum age and no owner/operator.
 If it needs different sources or an age limit, deploy another adapter.
 `tomb:configure:rebates` sets the treasury's share oracle from the configured

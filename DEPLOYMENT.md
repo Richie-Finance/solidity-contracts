@@ -2,11 +2,12 @@
 
 This guide covers the Tomb core contracts, optional redemption/zap/rebates,
 oracle operation, and contract verification. Commands below use PowerShell from
-`C:\repo` and select **PulseChain mainnet, chain ID 369**.
+`C:\repo\Richie-Finance` and select **PulseChain mainnet, chain ID 369**.
 
 > These are real mainnet transactions. Deployment and configuration do not
-> remove the risks documented in [TombSecurityReview.txt](TombSecurityReview.txt).
-> Test with small amounts before opening deposits to users.
+> remove protocol or integration risks. Pin and record the exact Git commit,
+> run the complete local test suite, and test with small amounts before opening
+> deposits to users.
 
 ## Contents
 
@@ -32,11 +33,13 @@ oracle operation, and contract verification. Commands below use PowerShell from
 Use a Node.js version supported by the installed Hardhat version, then run:
 
 ```powershell
-cd C:\repo
+cd C:\repo\Richie-Finance
 npm ci
 npx hardhat compile
 npm run tomb:check:scripts
-npx hardhat test test/Peg.test.ts test/Rebates.test.ts test/TombDeployment.test.ts test/TombReview.test.ts
+npm run tomb:test:smoke
+npm test
+git rev-parse HEAD
 ```
 
 Do not continue if compilation or tests fail. Local tests use mocks; passing
@@ -48,7 +51,7 @@ administration last.
 
 ## 2. Configure the root .env
 
-The scripts read **`C:\repo\.env`**, not an `.env` inside the Tomb folder.
+The scripts read **`C:\repo\Richie-Finance\.env`**, not an `.env` inside the Tomb folder.
 Merge [scripts/tomb/.env.example](scripts/tomb/.env.example) into the root file.
 Do not overwrite existing settings blindly or commit your real `.env`.
 
@@ -206,6 +209,9 @@ TOMB_BOARDROOM_ADDRESS=0xBoardroom
 TOMB_TREASURY_ADDRESS=0xTreasury
 ```
 
+Core deployment uses the same `TOMB_START_TIME` as SHARE, Genesis, and the
+default Farm schedule. There is no separate `TOMB_TREASURY_START_TIME`.
+
 Then deploy Farm:
 
 Set the required native-PLS fee destination before deployment. Use the intended
@@ -239,6 +245,10 @@ TOMB_PSM_MAX_ORACLE_AGE=7200
 TOMB_PSM_FEE_RECIPIENT=0xFeeWallet
 TOMB_MIN_CLAIM_THRESHOLD=1000000000000
 ```
+
+On later configuration runs, omitting `TOMB_PSM_ENABLED` preserves the current
+on-chain state. The configuration script does not temporarily disable an active
+PSM while applying other settings.
 
 In this example:
 
@@ -475,7 +485,7 @@ time. For a newly seeded pair, allow approximately:
 Run:
 
 ```powershell
-cd C:\repo
+cd C:\repo\Richie-Finance
 npm run tomb:update:oracles -- --network pulse
 ```
 
@@ -520,9 +530,13 @@ not exceed their maximum age. Defaults are 7,200 seconds for the Farm PSM and
 86,400 seconds for rebates. Keep observation periods within those limits and
 allow operational headroom for transaction delays.
 
-Update PEG pricing before Treasury allocations. Waiting for full observations
-in this script does not fix the permissionless short-window Oracle vulnerability
-described in the security review; other callers can still interact with the contract.
+`Oracle.update()` now requires at least one complete observation period, so the
+historical one-second stored-price overwrite does not apply to this release.
+RF-01 is instead an update-ordering issue: Treasury calls the PEG oracle update
+inside `allocateSeigniorage()`. Do not send a standalone PEG-oracle update
+immediately before allocation, because the second update can revert before the
+next oracle epoch. SHARE and rebate source oracles still require regular external
+updates.
 
 ## 13. Launch and operate Treasury
 
@@ -531,8 +545,8 @@ allocation; allocation to an empty Boardroom can revert. Plan this alongside
 the limited initial SHARE available for liquidity and reserves.
 
 Treasury emissions are not automatic. After launch, call `allocateSeigniorage()`
-when eligible, then maintain calls for the six-hour Treasury epochs. Oracle
-updates and Treasury allocation are separate operations.
+when eligible, then maintain calls for the six-hour Treasury epochs. The call
+updates the PEG oracle internally; do not race it with a separate PEG update.
 
 To call Treasury manually:
 
@@ -567,9 +581,9 @@ Deployment scripts print verification commands. Replace `<network>` with
 `pulse`. Examples, with placeholders to replace:
 
 ```powershell
-cd C:\repo
+cd C:\repo\Richie-Finance
 npx hardhat verify --network pulse PEG_ADDRESS
-npx hardhat verify --network pulse SHARE_ADDRESS ORIGINAL_START_TIMESTAMP COMMUNITY_WALLET DEV_WALLET
+npx hardhat verify --network pulse SHARE_ADDRESS ORIGINAL_START_TIMESTAMP COMMUNITY_WALLET
 npx hardhat verify --network pulse GENESIS_ADDRESS PEG_ADDRESS ORIGINAL_START_TIMESTAMP
 npx hardhat verify --network pulse TREASURY_ADDRESS
 npx hardhat verify --network pulse BOARDROOM_ADDRESS

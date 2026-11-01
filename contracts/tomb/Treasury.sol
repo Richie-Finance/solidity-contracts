@@ -50,10 +50,6 @@ interface IOracle {
         uint256 amountIn
     ) external view returns (uint144 amountOut);
 
-    function twap(
-        address token,
-        uint256 amountIn
-    ) external view returns (uint144 amountOut);
 }
 
 interface IBoardroom {
@@ -114,8 +110,8 @@ contract Treasury is ContractGuard {
 
     // Exclusions from circulating supply.
     address[] public excludedFromTotalSupply = [
-        address(0x5AC71BAd7DCc7A94EFb4704b21A85B58FaCb5633), //DAO Multisig
-        address(0x5AC71BAd7DCc7A94EFb4704b21A85B58FaCb5633), //Genesis contract
+        address(0x6831f815963FfCe95521271b94164eb4C82e7621), //DAO Multisig
+        address(0xb4ABb8B0F27D1fF26eA39725D996613Fa1b43073), //Genesis contract
         address(0x5AC71BAd7DCc7A94EFb4704b21A85B58FaCb5633) //Redemption contract
     ];
 
@@ -210,14 +206,6 @@ contract Treasury is ContractGuard {
 
     function getPegPrice() public view returns (uint256 pegPrice) {
         try IOracle(pegOracle).consult(peg, 1e18) returns (uint144 price) {
-            return uint256(price);
-        } catch {
-            revert("Treasury: failed to consult peg price from the oracle");
-        }
-    }
-
-    function getPegUpdatedPrice() public view returns (uint256 pegPrice) {
-        try IOracle(pegOracle).twap(peg, 1e18) returns (uint144 price) {
             return uint256(price);
         } catch {
             revert("Treasury: failed to consult peg price from the oracle");
@@ -354,7 +342,7 @@ contract Treasury is ContractGuard {
     }
 
     function _updatePegPrice() internal {
-        IOracle(pegOracle).update();
+        try IOracle(pegOracle).update() {} catch {}
     }
 
     function getPegCirculatingSupply() public view returns (uint256) {
@@ -436,7 +424,10 @@ contract Treasury is ContractGuard {
             oracleUpdated <= block.timestamp && block.timestamp - oracleUpdated <= PERIOD,
             "Treasury: stale oracle"
         );
-        previousEpochPegPrice = getPegPrice();
+        uint256 pegPrice = getPegPrice();
+        require(pegPrice > 0, "Treasury: invalid oracle price");
+
+        previousEpochPegPrice = pegPrice;
         uint256 pegSupply = getPegCirculatingSupply();
 
         if (epoch < bootstrapEpochs) {

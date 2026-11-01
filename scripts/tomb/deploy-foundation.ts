@@ -1,70 +1,25 @@
-import {getAddress, isAddress} from "ethers";
-import {network} from "hardhat";
+import { address, context, deploy, entry, future, uint, type Context } from "./helpers.js";
 
-function requiredAddress(name: string): string {
-  const value = process.env[name];
-  if (!value || !isAddress(value)) {
-    throw new Error(`${name} must be a valid address`);
-  }
-  return getAddress(value);
-}
+export async function main(ctx?: Context) {
+  ctx ??= await context();
+  const startTime = uint("TOMB_START_TIME");
+  const communityFund = address("TOMB_COMMUNITY_FUND");
+  await future(ctx, startTime, "TOMB_START_TIME");
 
-function requiredTimestamp(name: string): bigint {
-  const value = process.env[name];
-  if (!value || !/^\d+$/.test(value)) {
-    throw new Error(`${name} must be a Unix timestamp`);
-  }
-  return BigInt(value);
-}
-
-async function main() {
-  const {ethers} = await network.connect();
-  const [deployer] = await ethers.getSigners();
-
-  const startTime = requiredTimestamp("TOMB_START_TIME");
-  const communityFund = requiredAddress("TOMB_COMMUNITY_FUND");
-
-  const latestBlock = await ethers.provider.getBlock("latest");
-  if (!latestBlock || startTime <= BigInt(latestBlock.timestamp)) {
-    throw new Error("TOMB_START_TIME must be in the future");
-  }
-
-  console.log("Deployer:", deployer.address);
+  console.log("Deployer:", ctx.signer.address);
   console.log("Start time:", startTime.toString());
 
-  const Peg = await ethers.getContractFactory("contracts/tomb/Peg.sol:Peg");
-  const peg = await Peg.deploy();
-  await peg.waitForDeployment();
-  const pegAddress = await peg.getAddress();
-  console.log("PEG:", pegAddress);
+  const peg = await deploy(ctx, "peg", "TOMB_PEG_ADDRESS", []);
+  const share = await deploy(ctx, "share", "TOMB_SHARE_ADDRESS", [
+    startTime,
+    communityFund,
+  ]);
+  const genesis = await deploy(ctx, "genesis", "TOMB_GENESIS_ADDRESS", [
+    await peg.getAddress(),
+    startTime,
+  ]);
 
-  const Share = await ethers.getContractFactory(
-    "contracts/tomb/Share.sol:Share",
-  );
-  const share = await Share.deploy(startTime, communityFund);
-  await share.waitForDeployment();
-  const shareAddress = await share.getAddress();
-  console.log("SHARE:", shareAddress);
-
-  const Genesis = await ethers.getContractFactory(
-    "contracts/tomb/GenesisRewardPool.sol:GenesisRewardPool",
-  );
-  const genesis = await Genesis.deploy(pegAddress, startTime);
-  await genesis.waitForDeployment();
-  const genesisAddress = await genesis.getAddress();
-  console.log("GenesisRewardPool:", genesisAddress);
-
-  console.log("\nVerification commands:");
-  console.log(`npx hardhat verify --network <network> ${pegAddress}`);
-  console.log(
-    `npx hardhat verify --network <network> ${shareAddress} ${startTime} ${communityFund}`,
-  );
-  console.log(
-    `npx hardhat verify --network <network> ${genesisAddress} ${pegAddress} ${startTime}`,
-  );
+  return { peg, share, genesis };
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+await entry(import.meta.url, () => main());
