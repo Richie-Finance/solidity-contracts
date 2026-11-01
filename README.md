@@ -10,10 +10,6 @@ Mocha integration test suite.
 - Full deployment runbook: [DEPLOYMENT.md](./DEPLOYMENT.md)
 - Deployment script notes: [scripts/tomb/README.md](./scripts/tomb/README.md)
 
-> `Oracle.sol` intentionally remains Solidity 0.6 for compatibility with the
-> existing TWAP implementation. The other protocol contracts target Solidity
-> 0.8.20.
-
 ## Contract outline
 
 | Contract | Role |
