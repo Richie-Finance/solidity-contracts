@@ -6,6 +6,7 @@ export async function main(ctx?: Context) {
   const period = uint("TOMB_ORACLE_PERIOD", 6n * 60n * 60n);
   const startTime = uint("TOMB_ORACLE_START_TIME");
   if (period === 0n) throw new Error("TOMB_ORACLE_PERIOD must be positive");
+  if (startTime < period) throw new Error("TOMB_ORACLE_START_TIME must be at least the oracle period");
   await code(ctx, pair);
 
   console.log("Deployer:", ctx.signer.address);

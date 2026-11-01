@@ -403,12 +403,12 @@ TWAPs, not an exact direct-pair TWAP; liquidity, manipulation, and DAI market
 risks remain. `twap()` on the adapter is a
 compatibility alias for the stored quote, not a fresh shorter-window sample.
 
-Important inherited limitation: Oracle.sol's epoch scheduling permits a caller
-to overwrite a long average with a very short observation around an epoch
-boundary. The adapter's update method and maintenance script avoid doing this,
-but cannot prevent someone calling either source Oracle directly. Freshness is
-not proof of a full-length TWAP. This adapter does NOT fix that existing Oracle
-finding; address that separately before relying on the rebates in production.
+The source Oracle remains permissionless to update, but this release requires
+the full configured observation period in `Oracle.update()`. A caller cannot
+replace a stored average with a one-second window around an epoch boundary.
+The composite adapter still combines two separately timed stored observations,
+so use comparable source periods and keep both sources fresh; freshness alone
+does not make the two-leg cross-price an exact direct-pair TWAP.
 
 For a new treasury:
 
@@ -722,9 +722,9 @@ const balance = await ethers.provider.getBalance(await farm.getAddress());
 console.log("Available PLS:", ethers.formatEther(balance));
 ```
 
-For the current deployment, `TOMB_FARM_ADDRESS` is
-`0xa0CBde0D37dFd1438A49A74fA47578439Ec35a23`. Confirm your root `.env` points
-to the intended Farm before continuing.
+The console reads `TOMB_FARM_ADDRESS` from the root `.env`. Confirm that it
+points to the intended deployed Farm before continuing; do not copy a Farm
+address from an older deployment or from another network.
 
 The calling wallet must match `operator()`. Confirm that `psmFeeRecipient()` is
 the intended destination. The wallet also needs its own PLS for transaction gas.
