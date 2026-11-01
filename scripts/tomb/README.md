@@ -114,8 +114,9 @@ Run these commands from the repository root. They select PulseChain mainnet.
    Wait a full observation period after deployment/last update. The script
    skips observations not ready; it does not sleep or install a scheduler.
    Run regularly before SHARE becomes stale. Treasury updates the PEG oracle
-   inside `allocateSeigniorage()`, so do not send a separate PEG update
-   immediately before allocation. Once SHARE has a fresh nonzero price, set
+   inside `allocateSeigniorage()`. If another account updated it immediately
+   beforehand, Treasury validates and uses the fresh nonzero stored price.
+   Once SHARE has a fresh nonzero price, set
    `TOMB_PSM_ENABLED=true` and rerun farm configuration.
    Later reruns may omit `TOMB_PSM_ENABLED` to preserve the current on-chain
    state. Configuration never temporarily disables an active PSM.

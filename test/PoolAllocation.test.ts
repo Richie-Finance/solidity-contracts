@@ -146,4 +146,119 @@ describe("Pool allocation activation", () => {
     await networkHelpers.time.increase(100);
     expect(await farm.pendingShare(1, user.address)).to.equal(rewardAtDeactivation);
   });
+
+  it("bounds Genesis allocations without blocking rewards or principal exits", async () => {
+    const [, alice, bob] = await ethers.getSigners();
+    const cash = await ethers.deployContract("TombScriptToken");
+    const tokenA = await ethers.deployContract("TombScriptToken");
+    const tokenB = await ethers.deployContract("TombScriptToken");
+    const tokenC = await ethers.deployContract("TombScriptToken");
+    const latest = (await ethers.provider.getBlock("latest"))!.timestamp;
+    const start = BigInt(latest) + 1000n;
+    const genesis = await ethers.deployContract("GenesisRewardPool", [
+      await cash.getAddress(),
+      start,
+    ]);
+    const max = await genesis.MAX_ALLOC_POINT();
+
+    await genesis.add(max, await tokenA.getAddress(), 0);
+    await expect(
+      genesis.add(max + 1n, await tokenB.getAddress(), 0),
+    ).to.be.revertedWith("Pool: allocation too high");
+
+    await genesis.add(0, await tokenB.getAddress(), 0);
+    await expect(genesis.set(1, max + 1n)).to.be.revertedWith(
+      "Pool: allocation too high",
+    );
+    await genesis.set(1, max);
+    expect((await genesis.poolInfo(0)).allocPoint).to.equal(max);
+    expect((await genesis.poolInfo(1)).allocPoint).to.equal(max);
+
+    await expect(
+      genesis.add(max + 1n, await tokenC.getAddress(), 0),
+    ).to.be.revertedWith("Pool: allocation too high");
+
+    for (const account of [alice, bob]) {
+      await tokenA.mint(account.address, ethers.parseEther("100"));
+      await tokenA
+        .connect(account)
+        .approve(await genesis.getAddress(), ethers.MaxUint256);
+      await genesis.connect(account).deposit(0, ethers.parseEther("100"));
+    }
+    await cash.mint(
+      await genesis.getAddress(),
+      await genesis.TOTAL_REWARDS(),
+    );
+
+    await networkHelpers.time.increaseTo(start + 100n);
+    expect(await genesis.pendingRewards(0, alice.address)).to.be.greaterThan(0n);
+    expect(await genesis.pendingRewards(0, bob.address)).to.be.greaterThan(0n);
+
+    await genesis.connect(alice).withdraw(0, ethers.parseEther("100"));
+    await genesis.connect(bob).emergencyWithdraw(0);
+
+    expect(await tokenA.balanceOf(alice.address)).to.equal(
+      ethers.parseEther("100"),
+    );
+    expect(await tokenA.balanceOf(bob.address)).to.equal(
+      ethers.parseEther("100"),
+    );
+    expect((await genesis.poolInfo(0)).totalStaked).to.equal(0n);
+  });
+
+  it("bounds Farm allocations without blocking rewards or principal exits", async () => {
+    const [, alice, bob, feeRecipient] = await ethers.getSigners();
+    const rich = await ethers.deployContract("TombScriptToken");
+    const tokenA = await ethers.deployContract("TombScriptToken");
+    const tokenB = await ethers.deployContract("TombScriptToken");
+    const tokenC = await ethers.deployContract("TombScriptToken");
+    const latest = (await ethers.provider.getBlock("latest"))!.timestamp;
+    const start = BigInt(latest) + 1000n;
+    const farm = await ethers.deployContract("ShareRewardPool", [
+      await rich.getAddress(),
+      start,
+      feeRecipient.address,
+    ]);
+    const max = await farm.MAX_ALLOC_POINT();
+
+    await farm.add(max, await tokenA.getAddress());
+    await expect(
+      farm.add(max + 1n, await tokenB.getAddress()),
+    ).to.be.revertedWith("Pool: allocation too high");
+
+    await farm.add(0, await tokenB.getAddress());
+    await expect(farm.set(1, max + 1n)).to.be.revertedWith(
+      "Pool: allocation too high",
+    );
+    await farm.set(1, max);
+    expect((await farm.poolInfo(0)).allocPoint).to.equal(max);
+    expect((await farm.poolInfo(1)).allocPoint).to.equal(max);
+
+    await expect(
+      farm.add(max + 1n, await tokenC.getAddress()),
+    ).to.be.revertedWith("Pool: allocation too high");
+
+    for (const account of [alice, bob]) {
+      await tokenA.mint(account.address, ethers.parseEther("100"));
+      await tokenA
+        .connect(account)
+        .approve(await farm.getAddress(), ethers.MaxUint256);
+      await farm.connect(account).deposit(0, ethers.parseEther("100"));
+    }
+
+    await networkHelpers.time.increaseTo(start + 100n);
+    expect(await farm.pendingShare(0, alice.address)).to.be.greaterThan(0n);
+    expect(await farm.pendingShare(0, bob.address)).to.be.greaterThan(0n);
+
+    await farm.connect(alice).withdraw(0, ethers.parseEther("100"));
+    await farm.connect(bob).emergencyWithdraw(0);
+
+    expect(await tokenA.balanceOf(alice.address)).to.equal(
+      ethers.parseEther("100"),
+    );
+    expect(await tokenA.balanceOf(bob.address)).to.equal(
+      ethers.parseEther("100"),
+    );
+    expect((await farm.poolInfo(0)).totalStaked).to.equal(0n);
+  });
 });

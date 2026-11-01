@@ -421,7 +421,9 @@ contract Treasury is ContractGuard {
         _updatePegPrice();
         uint256 oracleUpdated = IOracle(pegOracle).blockTimestampLast();
         require(
-            oracleUpdated <= block.timestamp && block.timestamp - oracleUpdated <= PERIOD,
+            oracleUpdated != 0 &&
+                oracleUpdated <= block.timestamp &&
+                block.timestamp - oracleUpdated <= PERIOD,
             "Treasury: stale oracle"
         );
         uint256 pegPrice = getPegPrice();

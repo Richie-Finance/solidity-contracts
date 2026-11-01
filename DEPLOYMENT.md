@@ -532,11 +532,11 @@ allow operational headroom for transaction delays.
 
 `Oracle.update()` now requires at least one complete observation period, so the
 historical one-second stored-price overwrite does not apply to this release.
-RF-01 is instead an update-ordering issue: Treasury calls the PEG oracle update
-inside `allocateSeigniorage()`. Do not send a standalone PEG-oracle update
-immediately before allocation, because the second update can revert before the
-next oracle epoch. SHARE and rebate source oracles still require regular external
-updates.
+Treasury calls the PEG oracle update inside `allocateSeigniorage()`. If another
+account has just updated it, Treasury accepts that stored observation only when
+its timestamp is nonzero and no more than six hours old and its price is nonzero.
+The failed not-yet-due update attempt cannot block the Treasury epoch. SHARE and
+rebate source oracles still require regular external updates.
 
 ## 13. Launch and operate Treasury
 
@@ -546,7 +546,9 @@ the limited initial SHARE available for liquidity and reserves.
 
 Treasury emissions are not automatic. After launch, call `allocateSeigniorage()`
 when eligible, then maintain calls for the six-hour Treasury epochs. The call
-updates the PEG oracle internally; do not race it with a separate PEG update.
+updates the PEG oracle internally. A separate successful PEG update immediately
+before allocation is safe; Treasury validates and uses the fresh stored price if
+its own update attempt is not yet due.
 
 To call Treasury manually:
 

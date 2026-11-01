@@ -10,6 +10,7 @@ contract GenesisRewardPool is ReentrancyGuard {
 
     uint256 public constant BPS = 10_000;
     uint256 public constant MAX_DEPOSIT_FEE_BPS = 1_00; // Max 1% deposit fee
+    uint256 public constant MAX_ALLOC_POINT = 1_000_000;
 
     // Governance.
     address public operator;
@@ -85,6 +86,7 @@ contract GenesisRewardPool is ReentrancyGuard {
         require(address(_token) != address(0), "GenesisPool: zero pool token");
         require(_depositFeeBps <= MAX_DEPOSIT_FEE_BPS, "deposit fee too high");
         require(_token != peg, "GenesisPool: PEG cannot be a pool token");
+        require(_allocPoint <= MAX_ALLOC_POINT,"Pool: allocation too high");
         checkPoolDuplicate(_token);
 
         // Settle every existing pool with the old allocation weights before
@@ -111,6 +113,7 @@ contract GenesisRewardPool is ReentrancyGuard {
     }
 
     function set(uint256 _pid, uint256 _allocPoint) public onlyOperator {
+        require(_allocPoint <= MAX_ALLOC_POINT,"Pool: allocation too high");
         massUpdatePools();
 
         PoolInfo storage pool = poolInfo[_pid];

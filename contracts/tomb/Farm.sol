@@ -18,6 +18,7 @@ contract ShareRewardPool is ReentrancyGuard {
 
     uint256 public constant BPS = 10_000;
     uint256 public constant MAX_PSM_FEE_BPS = 5000;
+    uint256 public constant MAX_ALLOC_POINT = 1_000_000;
     address public constant WPLS =
         0xA1077a294dDE1B09bB078844df40758a5D0f9a27;
 
@@ -106,6 +107,7 @@ contract ShareRewardPool is ReentrancyGuard {
     ) external onlyOperator {
         require(address(_token) != address(0), "ShareRewardPool: zero pool token");
         require(_token != share, "ShareRewardPool: reward token cannot be staked");
+        require(_allocPoint <= MAX_ALLOC_POINT,"Pool: allocation too high");
         checkPoolDuplicate(_token);
 
         // Settle every existing pool with the old allocation weights before
@@ -131,6 +133,7 @@ contract ShareRewardPool is ReentrancyGuard {
     }
 
     function set(uint256 _pid, uint256 _allocPoint) public onlyOperator {
+        require(_allocPoint <= MAX_ALLOC_POINT,"Pool: allocation too high");
         massUpdatePools();
 
         PoolInfo storage pool = poolInfo[_pid];
