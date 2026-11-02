@@ -229,11 +229,11 @@ contract Boardroom is ShareWrapper, ContractGuard {
             "Boardroom: withdraw lockup must be at least reward lockup"
         );
         require(
-            _withdrawLockupEpochs <= 56,
+            _withdrawLockupEpochs <= 12,
             "Boardroom: withdraw lockup must not exceed 56 epochs"
         );
         require(
-            _rewardLockupEpochs <= 56,
+            _rewardLockupEpochs <= 12,
             "Boardroom: reward lockup must not exceed 56 epochs"
         );
 

@@ -309,7 +309,7 @@ contract Treasury is ContractGuard {
         uint256 newBootstrapExpansionPercent
     ) external onlyOperator {
         require(block.timestamp < startTime, "Treasury already started");
-        require(newBootstrapEpochs <= 120, "_bootstrapEpochs: out of range");
+        require(newBootstrapEpochs <= 28, "_bootstrapEpochs: out of range");
         require(
             newBootstrapExpansionPercent >= 100 &&
                 newBootstrapExpansionPercent <= 1_000,
@@ -326,11 +326,11 @@ contract Treasury is ContractGuard {
         uint256 newDevFundSharedPercent
     ) external onlyOperator {
         require(newDaoFund != address(0), "zero dao fund");
-        require(newDaoFundSharedPercent <= 2_500, "dao percent out of range");
+        require(newDaoFundSharedPercent <= 1_500, "dao percent out of range");
         require(newDevFund != address(0), "zero dev fund");
         require(newDevFundSharedPercent <= 500, "dev percent out of range");
         require(
-            newDaoFundSharedPercent + newDevFundSharedPercent <= 10_000,
+            newDaoFundSharedPercent + newDevFundSharedPercent <= 2_000,
             "combined percent out of range"
         );
 
