@@ -110,8 +110,8 @@ contract Treasury is ContractGuard {
 
     // Exclusions from circulating supply.
     address[] public excludedFromTotalSupply = [
-        address(0x6831f815963FfCe95521271b94164eb4C82e7621), //DAO Multisig
-        address(0xb4ABb8B0F27D1fF26eA39725D996613Fa1b43073) //Genesis contract
+        address(0x1EA35487AE62322F61f4C0F639a598d9eEB2F340), //DAO Multisig
+        address(0x330876824A3b91aeC9048d1d55724aFff86C9682) //Genesis contract
     ];
 
     // Core components.
