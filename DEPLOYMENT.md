@@ -432,11 +432,25 @@ These settings mean a 7% bonus, three-day vesting, and a PLS multiplier of 1.
 The discount uses 1e6 precision and cannot exceed `500000` (50%).
 Leave `TOMB_REBATE_ASSETS` blank for the default official DAI setup. Leave PLS
 enabled blank/false if not configuring PLS rebates. To add pDAI or another ERC20,
-provide a direct token/official-DAI oracle:
+provide a direct token/official-DAI oracle or a separate asset/WPLS ->
+WPLS/official-DAI composite adapter:
 
 ```dotenv
 TOMB_REBATE_ASSETS='[{"token":"0x6B175474E89094C44Da98b954EedeAC495271d0F","multiplier":"1000000","oracle":"0xPdaiDaiOracle"}]'
 ```
+
+For the composite route, set `TOMB_REBATE_ASSET_TOKEN_ADDRESS`,
+`TOMB_REBATE_ASSET_PAIR_ADDRESS`, `TOMB_REBATE_ASSET_ORACLE_PERIOD` and
+`TOMB_REBATE_ASSET_ORACLE_START_TIME`, then run:
+
+```powershell
+npm run tomb:deploy:rebate-asset-pls-oracle -- --network pulse
+npm run tomb:deploy:rebate-asset-composite-oracle -- --network pulse
+```
+
+Save the first address as `TOMB_REBATE_ASSET_ORACLE_ADDRESS`. Use the second
+address as the `oracle` in `TOMB_REBATE_ASSETS`. Do not replace the RICH
+composite; both composite adapters must be called hourly.
 
 One SHARE is `1000000000000000000` raw units. Fund the rebate reserve using
 SHARE the owner actually holds, separately from Farm reward obligations.
@@ -446,7 +460,8 @@ npm run tomb:configure:rebates -- --network pulse
 ```
 
 Official DAI is enabled by the constructor and needs no additional asset oracle.
-pDAI and every other configured ERC20 require a direct token/official-DAI oracle.
+pDAI and every other configured ERC20 require a direct token/official-DAI oracle
+or the supported two-leg composite route.
 The contract normalizes each configured token's native decimals into the
 18-decimal DAI quote; tokens reporting more than 36 decimals are rejected.
 Deploy a new RebateTreasury when migrating from the former USDC-denominated

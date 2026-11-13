@@ -1,6 +1,8 @@
 import { expect } from "chai";
 import { network } from "hardhat";
 import { main as deployComposite } from "../scripts/tomb/deploy-rebate-composite-oracle.js";
+import { main as deployAssetPlsOracle } from "../scripts/tomb/deploy-rebate-asset-pls-oracle.js";
+import { main as deployAssetComposite } from "../scripts/tomb/deploy-rebate-asset-composite-oracle.js";
 import { main as updateSources } from "../scripts/tomb/update-rebate-oracles.js";
 import { main as configureRebates } from "../scripts/tomb/configure-rebates.js";
 import { main as transferAdmin } from "../scripts/tomb/transfer-administration.js";
@@ -115,6 +117,46 @@ describe("Rebate composite cross-TWAP", () => {
       await networkHelpers.time.increase(3601);
       await updateSources(ctx);
       expect(await adapter.consult(await f.share.getAddress(), 10n ** 18n)).to.equal(ethers.parseEther("2"));
+    } finally {
+      keys.forEach((key, i) => { if (saved[i] === undefined) delete process.env[key]; else process.env[key] = saved[i]; });
+    }
+  });
+
+  it("deploys a second asset/WPLS composite without changing the RICH adapter", async () => {
+    const f = await networkHelpers.loadFixture(fixture);
+    const asset = await ethers.deployContract("TombScriptToken");
+    const pair = await ethers.deployContract("TombScriptPair", [await asset.getAddress(), WPLS]);
+    // 200 WPLS per asset * 0.0001 DAI per WPLS = 0.02 DAI per asset.
+    await pair.setReserves(10n ** 18n, 200n * 10n ** 18n);
+    const now = (await ethers.provider.getBlock("latest"))!.timestamp;
+    const keys = [
+      "TOMB_REBATE_ASSET_TOKEN_ADDRESS",
+      "TOMB_REBATE_ASSET_PAIR_ADDRESS",
+      "TOMB_REBATE_ASSET_ORACLE_ADDRESS",
+      "TOMB_REBATE_ASSET_ORACLE_PERIOD",
+      "TOMB_REBATE_ASSET_ORACLE_START_TIME",
+      "TOMB_REBATE_PLS_ORACLE_ADDRESS",
+      "TOMB_REBATE_MAX_ORACLE_AGE",
+    ];
+    const saved = keys.map(k => process.env[k]);
+    try {
+      Object.assign(process.env, {
+        TOMB_REBATE_ASSET_TOKEN_ADDRESS: await asset.getAddress(),
+        TOMB_REBATE_ASSET_PAIR_ADDRESS: await pair.getAddress(),
+        TOMB_REBATE_ASSET_ORACLE_PERIOD: "3600",
+        TOMB_REBATE_ASSET_ORACLE_START_TIME: now.toString(),
+        TOMB_REBATE_PLS_ORACLE_ADDRESS: await f.plsOracle.getAddress(),
+        TOMB_REBATE_MAX_ORACLE_AGE: "7200",
+      });
+      const ctx = {ethers, signer: f.owner};
+      const source = await deployAssetPlsOracle(ctx);
+      process.env.TOMB_REBATE_ASSET_ORACLE_ADDRESS = await source.getAddress();
+      const assetAdapter = await deployAssetComposite(ctx);
+      expect(await f.adapter.token0()).to.equal(await f.share.getAddress());
+      expect(await assetAdapter.token0()).to.equal(await asset.getAddress());
+      await networkHelpers.time.increase(3601);
+      await assetAdapter.update();
+      expect(await assetAdapter.consult(await asset.getAddress(), 10n ** 18n)).to.equal(2n * 10n ** 16n);
     } finally {
       keys.forEach((key, i) => { if (saved[i] === undefined) delete process.env[key]; else process.env[key] = saved[i]; });
     }

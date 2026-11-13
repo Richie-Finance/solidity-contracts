@@ -218,12 +218,29 @@ Optional `TOMB_REBATE_ASSETS` example:
 TOMB_REBATE_ASSETS='[{"token":"0x6B175474E89094C44Da98b954EedeAC495271d0F","multiplier":"1000000","oracle":"0xPdaiDaiOracle"}]'
 ```
 
+An asset with deeper WPLS liquidity can instead use a second composite route:
+asset/WPLS -> WPLS/official-DAI. Keep the RICH composite unchanged. Set the
+asset token, asset/WPLS pair, one-hour period and current start timestamp, then:
+
+```powershell
+npm run tomb:deploy:rebate-asset-pls-oracle -- --network pulse
+# Save TOMB_REBATE_ASSET_ORACLE_ADDRESS, then:
+npm run tomb:deploy:rebate-asset-composite-oracle -- --network pulse
+# Save TOMB_REBATE_ASSET_COMPOSITE_ORACLE_ADDRESS as the asset oracle above.
+```
+
+`tomb:update:rebate-oracles` also updates the optional asset/WPLS source when
+`TOMB_REBATE_ASSET_ORACLE_ADDRESS` is set. Production keepers must call both
+the RICH composite and asset composite each hour. The shared WPLS/DAI source is
+updated by the first due adapter and skipped by the other until its next period.
+
 Multiplier precision is 1e6. Discount defaults to 70,000 (7% with a 1e6
 denominator) and is capped at 500,000 (50%). Vesting defaults to 259,200 seconds.
 `TOMB_REBATE_SHARE_RESERVE_WEI` is
 a target reserve funded from the owner's existing SHARE, separate from farm
 rewards. Direct official DAI does not need an asset oracle: its value is measured
-in DAI itself. pDAI and other non-LP assets require direct token/DAI price oracles.
+in DAI itself. pDAI and other non-LP assets require either a direct token/DAI
+oracle or a token/WPLS -> WPLS/DAI composite oracle.
 The contract reads each configured token's decimals and normalizes the quote;
 tokens with more than 36 decimals are rejected.
 LP assets and LP reserve-based pricing have been removed from the contract and

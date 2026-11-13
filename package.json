@@ -5,6 +5,8 @@
   "main": "index.js",
   "scripts": {
     "tomb:deploy:rebate-composite-oracle": "hardhat run scripts/tomb/deploy-rebate-composite-oracle.ts",
+    "tomb:deploy:rebate-asset-pls-oracle": "hardhat run scripts/tomb/deploy-rebate-asset-pls-oracle.ts",
+    "tomb:deploy:rebate-asset-composite-oracle": "hardhat run scripts/tomb/deploy-rebate-asset-composite-oracle.ts",
     "tomb:update:rebate-oracles": "hardhat run scripts/tomb/update-rebate-oracles.ts",
     "test": "hardhat test",
     "tomb:test:smoke": "hardhat test test/TombDeployment.test.ts",

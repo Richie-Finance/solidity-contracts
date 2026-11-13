@@ -4,7 +4,9 @@ export async function main(ctx?: Context) {
   ctx ??= await context();
   // Updating sources directly also works after oracle administration is transferred.
   const seen = new Set<string>();
-  for (const env of ["TOMB_SHARE_ORACLE_ADDRESS", "TOMB_REBATE_PLS_ORACLE_ADDRESS"]) {
+  const sources = ["TOMB_SHARE_ORACLE_ADDRESS", "TOMB_REBATE_PLS_ORACLE_ADDRESS"];
+  if (process.env.TOMB_REBATE_ASSET_ORACLE_ADDRESS) sources.push("TOMB_REBATE_ASSET_ORACLE_ADDRESS");
+  for (const env of sources) {
     const target = address(env);
     if (seen.has(target)) continue;
     seen.add(target);
