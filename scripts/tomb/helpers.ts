@@ -1,4 +1,4 @@
-import { Contract, ZeroAddress, getAddress, isAddress } from "ethers";
+import { Contract, ZeroAddress, getAddress, isAddress, isHexString } from "ethers";
 import { network } from "hardhat";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -16,6 +16,7 @@ export const CONTRACTS = {
   rebateComposite: "contracts/tomb/RebateCompositeOracle.sol:RebateCompositeOracle",
   zap: "contracts/tomb/Zap.sol:PegPdaiZap",
   shareZap: "contracts/tomb/Zap.sol:ShareWplsZap",
+  pdaiRecovery: "contracts/tomb/PDAIRecoveryDistributor.sol:PDAIRecoveryDistributor",
 } as const;
 
 export async function context() {
@@ -44,6 +45,12 @@ export function uint(name: string, fallback?: bigint): bigint {
   const parsed = BigInt(value);
   if (parsed >= 2n ** 256n) throw new Error(`${name} exceeds uint256`);
   return parsed;
+}
+
+export function bytes32(name: string): string {
+  const value = process.env[name];
+  if (!value || !isHexString(value, 32)) throw new Error(`${name} must be a 32-byte hex value`);
+  return value.toLowerCase();
 }
 
 export function flag(name: string, fallback = false): boolean {

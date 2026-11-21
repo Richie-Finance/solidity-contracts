@@ -142,6 +142,45 @@ and supplies only the shortfall; it does not withdraw an excess reserve.
 Zero target means no funding. The owner can separately retrieve PDAI to an
 explicit recipient; the contract does not enforce a below-peg price or epoch cap.
 
+### BetterBank pDAI recovery distributor
+
+The deployment reads every immutable snapshot value from the environment and
+prints `TOMB_PDAI_RECOVERY_ADDRESS`. Save that address before continuing:
+
+```powershell
+npm run tomb:deploy:pdai-recovery -- --network pulse
+```
+
+For the one-hour pilot, leave
+`TOMB_PDAI_RECOVERY_INITIAL_CLAIM_PERIOD_SECONDS=3600`, set
+`TOMB_PDAI_RECOVERY_EXPECTED_EPOCH_ID=0`, and choose the raw pDAI amount in
+`TOMB_PDAI_RECOVERY_EPOCH_FUNDING_WEI`. The start script verifies ownership,
+the expected epoch ID, the previous epoch state, emergency state, signer
+balance, and approval before starting. Rerunning it with the same expected ID
+fails instead of creating a duplicate epoch:
+
+```powershell
+npm run tomb:start:pdai-recovery-epoch -- --network pulse
+```
+
+After the pilot has started, configure the period used by future epochs. The
+configuration script first verifies the deployed pDAI address, Merkle root,
+total eligible weight, and eligible account count against the environment:
+
+```powershell
+npm run tomb:configure:pdai-recovery -- --network pulse
+```
+
+`TOMB_PDAI_RECOVERY_CLAIM_PERIOD_SECONDS=2592000` configures future epochs for
+30 days without changing an existing pilot deadline. Both deployment and epoch
+start refuse a zero claim period unless
+`TOMB_PDAI_RECOVERY_ALLOW_NON_EXPIRING=true` is explicitly set. Never transfer
+pDAI directly to the distributor; the owner must approve it and use the epoch
+start script. Finalize the previous epoch before incrementing
+`TOMB_PDAI_RECOVERY_EXPECTED_EPOCH_ID` and launching the next one. Finalized
+rollover is included automatically; funding may be zero when rollover is
+nonzero.
+
 ### PEG/pDAI and SHARE/WPLS zaps
 
 ```powershell
