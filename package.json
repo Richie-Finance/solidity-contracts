@@ -29,6 +29,7 @@
     "tomb:configure:redeem": "hardhat run scripts/tomb/configure-redeem.ts",
     "tomb:configure:pdai-recovery": "hardhat run scripts/tomb/configure-pdai-recovery.ts",
     "tomb:start:pdai-recovery-epoch": "hardhat run scripts/tomb/start-pdai-recovery-epoch.ts",
+    "tomb:finalize:pdai-recovery-epoch": "hardhat run scripts/tomb/finalize-pdai-recovery-epoch.ts",
     "tomb:configure:rebates": "hardhat run scripts/tomb/configure-rebates.ts",
     "tomb:update:oracles": "hardhat run scripts/tomb/update-oracles.ts",
     "tomb:transfer:admin": "hardhat run scripts/tomb/transfer-administration.ts",

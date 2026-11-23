@@ -181,6 +181,14 @@ start script. Finalize the previous epoch before incrementing
 rollover is included automatically; funding may be zero when rollover is
 nonzero.
 
+Once the current block timestamp is strictly greater than an epoch's recorded
+deadline, set `TOMB_PDAI_RECOVERY_FINALIZE_EPOCH_ID` and finalize it. The script
+is safe to rerun after finalization and prints the resulting rollover balance:
+
+```powershell
+npm run tomb:finalize:pdai-recovery-epoch -- --network pulse
+```
+
 ### PEG/pDAI and SHARE/WPLS zaps
 
 ```powershell
